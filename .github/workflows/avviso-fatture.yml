@@ -1,0 +1,50 @@
+name: Avviso fatture
+
+# Avvisa nella proposta di modifica quando il lavoro tocca il calcolo delle
+# fatture. Non blocca nulla: serve solo a far sapere alle persone giuste che
+# devono guardare, prima che la modifica entri in main.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "src/fatture.js"
+      - "test/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  avviso:
+    name: Avvisa chi si occupa di amministrazione
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scrivi l'avviso nella proposta di modifica
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marcatore = "<!-- avviso-fatture -->";
+
+            const commenti = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            if (commenti.some((commento) => commento.body.includes(marcatore))) {
+              core.info("L'avviso c'e' gia': non ne scrivo un altro.");
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                marcatore,
+                "**Questa modifica tocca il calcolo delle fatture.**",
+                "",
+                "Va avvisato chi si occupa di amministrazione prima del merge.",
+              ].join("\n"),
+            });
